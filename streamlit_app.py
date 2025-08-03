@@ -12,6 +12,9 @@ import time
 import subprocess
 import sys
 
+# Version identifier to force cache refresh
+VERSION = "v2.1.0 - Fixed navigation and form issues"
+
 # Page configuration
 st.set_page_config(
     page_title="MLOps Observability Dashboard",
@@ -172,8 +175,9 @@ def create_dashboard():
         st.error("Failed to setup the project. Please check the logs.")
         return
     
-    # Header
+    # Header with version
     st.markdown('<h1 class="main-header">📊 MLOps Observability Dashboard</h1>', unsafe_allow_html=True)
+    st.caption(f"Version: {VERSION}")
     
     # Sidebar
     st.sidebar.title("Navigation")
