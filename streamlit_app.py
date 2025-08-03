@@ -13,7 +13,7 @@ import subprocess
 import sys
 
 # Version identifier to force cache refresh
-VERSION = "v2.1.0 - Fixed navigation and form issues"
+VERSION = "v2.2.0 - Force cache refresh " + str(int(time.time()))
 
 # Page configuration
 st.set_page_config(
@@ -725,4 +725,11 @@ def show_reports():
         st.plotly_chart(fig, use_container_width=True)
 
 if __name__ == "__main__":
+    # Force cache refresh
+    st.cache_data.clear()
+    st.cache_resource.clear()
+    
+    # Display version for debugging
+    st.sidebar.caption(f"App Version: {VERSION}")
+    
     create_dashboard() 
