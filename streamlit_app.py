@@ -423,20 +423,27 @@ def show_data_analysis():
     # Add churn column for correlation analysis
     df['Churn'] = np.random.choice([0, 1], size=len(df), p=[0.85, 0.15])
     
-    # Create correlation matrix
-    correlation_matrix = df.corr()
+    # Create correlation matrix only for numeric columns
+    numeric_df = df.select_dtypes(include=[np.number])
     
-    fig = px.imshow(
-        correlation_matrix,
-        title="Feature Correlation Matrix",
-        color_continuous_scale='RdBu',
-        aspect='auto'
-    )
-    st.plotly_chart(fig, use_container_width=True)
+    if not numeric_df.empty:
+        # Create correlation matrix
+        correlation_matrix = numeric_df.corr()
+        
+        fig = px.imshow(
+            correlation_matrix,
+            title="Feature Correlation Matrix",
+            color_continuous_scale='RdBu',
+            aspect='auto'
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("No numeric columns available for correlation analysis.")
     
     # Feature distributions
     st.subheader("📊 Feature Distributions")
     
+    # Create subplots for different data types
     fig = make_subplots(
         rows=2, cols=2,
         subplot_titles=('Tenure Months', 'Support Tickets', 'Monthly Charge', 'Contract Type'),
@@ -444,14 +451,53 @@ def show_data_analysis():
                [{"type": "histogram"}, {"type": "bar"}]]
     )
     
+    # Add traces for numeric columns
     fig.add_trace(go.Histogram(x=df['TenureMonths'], name='Tenure'), row=1, col=1)
     fig.add_trace(go.Histogram(x=df['SupportTickets'], name='Tickets'), row=1, col=2)
     fig.add_trace(go.Histogram(x=df['MonthlyCharge'], name='Charge'), row=2, col=1)
-    fig.add_trace(go.Bar(x=df['ContractType'].value_counts().index, 
-                         y=df['ContractType'].value_counts().values, name='Contract'), row=2, col=2)
+    
+    # Add bar chart for categorical column
+    contract_counts = df['ContractType'].value_counts()
+    fig.add_trace(go.Bar(x=contract_counts.index, 
+                         y=contract_counts.values, name='Contract'), row=2, col=2)
     
     fig.update_layout(height=600, showlegend=False)
     st.plotly_chart(fig, use_container_width=True)
+    
+    # Additional analysis
+    st.subheader("📈 Additional Insights")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Tenure vs Monthly Charge scatter plot
+        fig = px.scatter(df, x='TenureMonths', y='MonthlyCharge', 
+                        title='Tenure vs Monthly Charge',
+                        labels={'TenureMonths': 'Tenure (Months)', 'MonthlyCharge': 'Monthly Charge ($)'})
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        # Support Tickets distribution
+        fig = px.histogram(df, x='SupportTickets', title='Support Tickets Distribution',
+                          nbins=10)
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # Summary statistics
+    st.subheader("📋 Summary Statistics")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Average Tenure", f"{df['TenureMonths'].mean():.1f} months")
+        st.metric("Average Monthly Charge", f"${df['MonthlyCharge'].mean():.1f}")
+    
+    with col2:
+        st.metric("Average Support Tickets", f"{df['SupportTickets'].mean():.1f}")
+        st.metric("Most Common Contract", df['ContractType'].mode().iloc[0] if not df['ContractType'].mode().empty else "N/A")
+    
+    with col3:
+        st.metric("Total Customers", len(df))
+        st.metric("Data Points", len(df) * len(df.columns))
 
 def show_model_monitoring():
     """Show model monitoring section."""
