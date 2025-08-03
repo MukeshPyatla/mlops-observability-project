@@ -50,23 +50,29 @@ def setup_project():
     if not os.path.exists('models/churn_model.pkl'):
         st.info("🚀 First time setup: Generating data and training model...")
         
-        with st.spinner("Setting up the project..."):
+        with st.spinner("Setting up the project (this may take 2-3 minutes)..."):
             try:
-                # Run the setup script
+                # Run the setup script with timeout
                 result = subprocess.run([sys.executable, 'setup.py'], 
                                      capture_output=True, text=True, timeout=300)
                 
                 if result.returncode == 0:
                     st.success("✅ Setup completed successfully!")
+                    # Refresh the page to load the new model
+                    st.rerun()
                 else:
-                    st.error(f"❌ Setup failed: {result.stderr}")
-                    return False
+                    st.warning("⚠️ Setup had issues, but trying to continue...")
+                    st.code(result.stderr)
+                    # Try to continue with basic functionality
+                    return True
             except subprocess.TimeoutExpired:
-                st.error("❌ Setup timed out")
-                return False
+                st.warning("⚠️ Setup timed out, but the app will still work with basic functionality.")
+                st.info("The app will use sample data and basic predictions.")
+                return True
             except Exception as e:
                 st.error(f"❌ Setup error: {str(e)}")
-                return False
+                st.info("The app will use sample data and basic predictions.")
+                return True
     
     return True
 
@@ -99,7 +105,8 @@ def predict_churn(input_data):
     """Make churn prediction."""
     model = load_model()
     if model is None:
-        return None, None
+        # Fallback prediction using simple rules
+        return predict_churn_fallback(input_data)
     
     # Convert input to DataFrame
     input_df = pd.DataFrame([input_data])
@@ -107,6 +114,53 @@ def predict_churn(input_data):
     # Make prediction
     prediction = model.predict(input_df)[0]
     probability = model.predict_proba(input_df)[0][1]
+    
+    return prediction, probability
+
+def predict_churn_fallback(input_data):
+    """Fallback prediction using simple rules when model is not available."""
+    # Simple rule-based prediction
+    tenure = input_data['TenureMonths']
+    contract = input_data['ContractType']
+    tickets = input_data['SupportTickets']
+    charge = input_data['MonthlyCharge']
+    
+    # Calculate churn probability based on simple rules
+    probability = 0.1  # Base probability
+    
+    # Contract type impact
+    if contract == 'Month-to-month':
+        probability += 0.3
+    elif contract == 'One year':
+        probability += 0.1
+    else:  # Two year
+        probability += 0.05
+    
+    # Tenure impact
+    if tenure < 6:
+        probability += 0.2
+    elif tenure < 12:
+        probability += 0.15
+    elif tenure < 24:
+        probability += 0.05
+    
+    # Support tickets impact
+    if tickets > 3:
+        probability += 0.25
+    elif tickets > 1:
+        probability += 0.1
+    
+    # Monthly charge impact
+    if charge > 100:
+        probability += 0.1
+    elif charge < 50:
+        probability += 0.05
+    
+    # Cap probability
+    probability = min(probability, 0.95)
+    
+    # Determine prediction
+    prediction = 1 if probability > 0.5 else 0
     
     return prediction, probability
 
@@ -270,64 +324,67 @@ def show_churn_predictor():
             # Make prediction
             prediction, probability = predict_churn(input_data)
             
-            if prediction is not None:
-                # Display results
-                st.markdown('<div class="prediction-box">', unsafe_allow_html=True)
-                
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    if prediction == 1:
-                        st.error("🚨 **HIGH CHURN RISK**")
-                        st.metric("Churn Probability", f"{probability:.1%}")
-                    else:
-                        st.success("✅ **LOW CHURN RISK**")
-                        st.metric("Churn Probability", f"{probability:.1%}")
-                
-                with col2:
-                    # Create a gauge chart
-                    fig = go.Figure(go.Indicator(
-                        mode = "gauge+number+delta",
-                        value = probability * 100,
-                        domain = {'x': [0, 1], 'y': [0, 1]},
-                        title = {'text': "Churn Risk"},
-                        delta = {'reference': 50},
-                        gauge = {
-                            'axis': {'range': [None, 100]},
-                            'bar': {'color': "darkblue"},
-                            'steps': [
-                                {'range': [0, 30], 'color': "lightgreen"},
-                                {'range': [30, 70], 'color': "yellow"},
-                                {'range': [70, 100], 'color': "red"}
-                            ],
-                            'threshold': {
-                                'line': {'color': "red", 'width': 4},
-                                'thickness': 0.75,
-                                'value': 70
-                            }
+            # Display results
+            st.markdown('<div class="prediction-box">', unsafe_allow_html=True)
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if prediction == 1:
+                    st.error("🚨 **HIGH CHURN RISK**")
+                    st.metric("Churn Probability", f"{probability:.1%}")
+                else:
+                    st.success("✅ **LOW CHURN RISK**")
+                    st.metric("Churn Probability", f"{probability:.1%}")
+            
+            with col2:
+                # Create a gauge chart
+                fig = go.Figure(go.Indicator(
+                    mode = "gauge+number+delta",
+                    value = probability * 100,
+                    domain = {'x': [0, 1], 'y': [0, 1]},
+                    title = {'text': "Churn Risk"},
+                    delta = {'reference': 50},
+                    gauge = {
+                        'axis': {'range': [None, 100]},
+                        'bar': {'color': "darkblue"},
+                        'steps': [
+                            {'range': [0, 30], 'color': "lightgreen"},
+                            {'range': [30, 70], 'color': "yellow"},
+                            {'range': [70, 100], 'color': "red"}
+                        ],
+                        'threshold': {
+                            'line': {'color': "red", 'width': 4},
+                            'thickness': 0.75,
+                            'value': 70
                         }
-                    ))
-                    
-                    fig.update_layout(height=200)
-                    st.plotly_chart(fig, use_container_width=True)
+                    }
+                ))
                 
-                st.markdown('</div>', unsafe_allow_html=True)
-                
-                # Show feature importance
-                st.subheader("📊 Feature Analysis")
-                features = ['Tenure Months', 'Contract Type', 'Support Tickets', 'Monthly Charge']
-                importance = [0.35, 0.25, 0.25, 0.15]  # Mock importance scores
-                
-                fig = px.bar(
-                    x=features, 
-                    y=importance,
-                    title="Feature Importance",
-                    labels={'x': 'Features', 'y': 'Importance Score'}
-                )
+                fig.update_layout(height=200)
                 st.plotly_chart(fig, use_container_width=True)
-                
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Show feature importance
+            st.subheader("📊 Feature Analysis")
+            features = ['Tenure Months', 'Contract Type', 'Support Tickets', 'Monthly Charge']
+            importance = [0.35, 0.25, 0.25, 0.15]  # Mock importance scores
+            
+            fig = px.bar(
+                x=features, 
+                y=importance,
+                title="Feature Importance",
+                labels={'x': 'Features', 'y': 'Importance Score'}
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Show model status
+            model = load_model()
+            if model is None:
+                st.info("ℹ️ Using fallback prediction rules (model not available)")
             else:
-                st.error("❌ Model not found. Please ensure the model is trained.")
+                st.success("✅ Using trained XGBoost model")
 
 def show_data_analysis():
     """Show data analysis section."""

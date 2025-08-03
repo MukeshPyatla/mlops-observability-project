@@ -2,6 +2,7 @@
 """
 Setup script for MLOps Observability Project
 This script generates data and trains the model for Streamlit Cloud deployment.
+Optimized for faster deployment.
 """
 
 import os
@@ -15,13 +16,14 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
 import joblib
+import time
 
-def generate_customer_data(num_customers=2500, data_type='reference'):
+def generate_customer_data(num_customers=1000, data_type='reference'):
     """
     Generates synthetic customer data for a subscription service.
-    The 'current' data type will have different characteristics to simulate drift.
+    Optimized for faster generation.
     """
-    fake = Faker()
+    np.random.seed(42)  # For reproducibility
     data = []
     
     for i in range(num_customers):
@@ -68,8 +70,8 @@ def train_model():
     """Trains a churn prediction model on the reference dataset."""
     print("Loading reference data...")
     
-    # Generate reference data
-    df = generate_customer_data(num_customers=5000, data_type='reference')
+    # Generate reference data (reduced size for faster training)
+    df = generate_customer_data(num_customers=2000, data_type='reference')
 
     X = df.drop('Churn', axis=1)
     y = df['Churn']
@@ -86,10 +88,17 @@ def train_model():
             ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_features)
         ])
 
-    # Create the model pipeline
+    # Create the model pipeline with optimized parameters
     model_pipeline = Pipeline(steps=[
         ('preprocessor', preprocessor),
-        ('classifier', xgb.XGBClassifier(use_label_encoder=False, eval_metric='logloss', random_state=42))
+        ('classifier', xgb.XGBClassifier(
+            use_label_encoder=False, 
+            eval_metric='logloss', 
+            random_state=42,
+            n_estimators=50,  # Reduced for faster training
+            max_depth=4,       # Reduced for faster training
+            learning_rate=0.1  # Optimized for faster convergence
+        ))
     ])
 
     print("Training XGBoost model...")
@@ -107,34 +116,90 @@ def train_model():
     print("Reference training data saved for monitoring.")
 
 def main():
-    """Main setup function."""
+    """Main setup function with timeout protection."""
+    start_time = time.time()
+    max_setup_time = 180  # 3 minutes max
+    
     print("🚀 Setting up MLOps Observability Project...")
     
-    # Create necessary directories
-    os.makedirs('data', exist_ok=True)
-    os.makedirs('models', exist_ok=True)
-    os.makedirs('reports', exist_ok=True)
+    try:
+        # Create necessary directories
+        os.makedirs('data', exist_ok=True)
+        os.makedirs('models', exist_ok=True)
+        os.makedirs('reports', exist_ok=True)
+        
+        # Check timeout
+        if time.time() - start_time > max_setup_time:
+            raise TimeoutError("Setup taking too long")
+        
+        # Generate data (reduced size for faster generation)
+        print("📊 Generating synthetic customer data...")
+        reference_data = generate_customer_data(num_customers=2000, data_type='reference')
+        current_data = generate_customer_data(num_customers=2000, data_type='current')
+        
+        # Check timeout
+        if time.time() - start_time > max_setup_time:
+            raise TimeoutError("Data generation taking too long")
+        
+        reference_data.to_csv('data/reference_data.csv', index=False)
+        current_data.to_csv('data/current_data.csv', index=False)
+        print("✅ Data generated successfully!")
+        
+        # Check timeout
+        if time.time() - start_time > max_setup_time:
+            raise TimeoutError("Setup taking too long before model training")
+        
+        # Train model
+        print("🤖 Training churn prediction model...")
+        train_model()
+        print("✅ Model training completed!")
+        
+        total_time = time.time() - start_time
+        print(f"🎉 Setup completed successfully in {total_time:.1f} seconds!")
+        print("📁 Generated files:")
+        print("   - data/reference_data.csv")
+        print("   - data/current_data.csv")
+        print("   - data/reference_training_data.csv")
+        print("   - models/churn_model.pkl")
+        
+    except TimeoutError as e:
+        print(f"❌ Setup timed out: {e}")
+        print("Creating minimal setup for basic functionality...")
+        
+        # Create minimal setup for basic functionality
+        try:
+            os.makedirs('data', exist_ok=True)
+            os.makedirs('models', exist_ok=True)
+            
+            # Create minimal data
+            minimal_data = generate_customer_data(num_customers=500, data_type='reference')
+            minimal_data.to_csv('data/reference_data.csv', index=False)
+            
+            # Create a simple model for basic functionality
+            X = minimal_data.drop('Churn', axis=1)
+            y = minimal_data['Churn']
+            
+            # Simple model for basic functionality
+            from sklearn.ensemble import RandomForestClassifier
+            simple_model = RandomForestClassifier(n_estimators=10, random_state=42)
+            simple_model.fit(X, y)
+            
+            joblib.dump(simple_model, 'models/churn_model.pkl')
+            X.to_csv('data/reference_training_data.csv', index=False)
+            
+            print("✅ Minimal setup completed for basic functionality")
+            
+        except Exception as e2:
+            print(f"❌ Even minimal setup failed: {e2}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Setup failed: {e}")
+        return False
     
-    # Generate data
-    print("📊 Generating synthetic customer data...")
-    reference_data = generate_customer_data(num_customers=5000, data_type='reference')
-    current_data = generate_customer_data(num_customers=5000, data_type='current')
-    
-    reference_data.to_csv('data/reference_data.csv', index=False)
-    current_data.to_csv('data/current_data.csv', index=False)
-    print("✅ Data generated successfully!")
-    
-    # Train model
-    print("🤖 Training churn prediction model...")
-    train_model()
-    print("✅ Model training completed!")
-    
-    print("🎉 Setup completed successfully!")
-    print("📁 Generated files:")
-    print("   - data/reference_data.csv")
-    print("   - data/current_data.csv")
-    print("   - data/reference_training_data.csv")
-    print("   - models/churn_model.pkl")
+    return True
 
 if __name__ == "__main__":
-    main() 
+    success = main()
+    if not success:
+        sys.exit(1) 
