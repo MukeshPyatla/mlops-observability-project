@@ -276,39 +276,49 @@ def show_churn_predictor():
     st.header("🔮 Customer Churn Predictor")
     st.markdown("Enter customer information to predict churn probability.")
     
+    # Sample data buttons outside the form
+    st.markdown("**Sample Data:**")
+    col_a, col_b, col_c = st.columns(3)
+    
+    with col_a:
+        if st.button("High Risk"):
+            st.session_state.tenure = 3
+            st.session_state.contract = "Month-to-month"
+            st.session_state.tickets = 5
+            st.session_state.charge = 120.0
+            st.rerun()
+    
+    with col_b:
+        if st.button("Medium Risk"):
+            st.session_state.tenure = 12
+            st.session_state.contract = "One year"
+            st.session_state.tickets = 2
+            st.session_state.charge = 85.0
+            st.rerun()
+    
+    with col_c:
+        if st.button("Low Risk"):
+            st.session_state.tenure = 36
+            st.session_state.contract = "Two year"
+            st.session_state.tickets = 0
+            st.session_state.charge = 65.0
+            st.rerun()
+    
     # Input form
     with st.form("prediction_form"):
         col1, col2 = st.columns(2)
         
         with col1:
-            tenure_months = st.number_input("Tenure (Months)", min_value=1, max_value=60, value=12)
-            contract_type = st.selectbox("Contract Type", ["Month-to-month", "One year", "Two year"])
-            support_tickets = st.number_input("Support Tickets", min_value=0, max_value=20, value=1)
+            tenure_months = st.number_input("Tenure (Months)", min_value=1, max_value=60, 
+                                          value=st.session_state.get('tenure', 12))
+            contract_type = st.selectbox("Contract Type", ["Month-to-month", "One year", "Two year"],
+                                       index=["Month-to-month", "One year", "Two year"].index(st.session_state.get('contract', 'Month-to-month')))
+            support_tickets = st.number_input("Support Tickets", min_value=0, max_value=20, 
+                                           value=st.session_state.get('tickets', 1))
         
         with col2:
-            monthly_charge = st.number_input("Monthly Charge ($)", min_value=20.0, max_value=200.0, value=80.0, step=5.0)
-            
-            # Add some sample data buttons
-            st.markdown("**Sample Data:**")
-            col_a, col_b, col_c = st.columns(3)
-            with col_a:
-                if st.button("High Risk"):
-                    st.session_state.tenure = 3
-                    st.session_state.contract = "Month-to-month"
-                    st.session_state.tickets = 5
-                    st.session_state.charge = 120.0
-            with col_b:
-                if st.button("Medium Risk"):
-                    st.session_state.tenure = 12
-                    st.session_state.contract = "One year"
-                    st.session_state.tickets = 2
-                    st.session_state.charge = 85.0
-            with col_c:
-                if st.button("Low Risk"):
-                    st.session_state.tenure = 36
-                    st.session_state.contract = "Two year"
-                    st.session_state.tickets = 0
-                    st.session_state.charge = 65.0
+            monthly_charge = st.number_input("Monthly Charge ($)", min_value=20.0, max_value=200.0, 
+                                          value=st.session_state.get('charge', 80.0), step=5.0)
         
         submitted = st.form_submit_button("🔮 Predict Churn")
         
