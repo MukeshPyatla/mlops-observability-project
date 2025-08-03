@@ -177,20 +177,36 @@ def create_dashboard():
     
     # Sidebar
     st.sidebar.title("Navigation")
-    page = st.sidebar.selectbox(
+    
+    # Initialize navigation
+    if 'nav_page' not in st.session_state:
+        st.session_state.nav_page = "🏠 Dashboard"
+    
+    # Navigation options
+    nav_options = ["🏠 Dashboard", "🔮 Churn Predictor", "📈 Data Analysis", "🚨 Model Monitoring", "📊 Reports"]
+    
+    # Sidebar navigation
+    selected_page = st.sidebar.selectbox(
         "Choose a page",
-        ["🏠 Dashboard", "🔮 Churn Predictor", "📈 Data Analysis", "🚨 Model Monitoring", "📊 Reports"]
+        nav_options,
+        index=nav_options.index(st.session_state.nav_page)
     )
     
-    if page == "🏠 Dashboard":
+    # Update session state if sidebar selection changes
+    if selected_page != st.session_state.nav_page:
+        st.session_state.nav_page = selected_page
+        st.rerun()
+    
+    # Route to appropriate page
+    if st.session_state.nav_page == "🏠 Dashboard":
         show_dashboard()
-    elif page == "🔮 Churn Predictor":
+    elif st.session_state.nav_page == "🔮 Churn Predictor":
         show_churn_predictor()
-    elif page == "📈 Data Analysis":
+    elif st.session_state.nav_page == "📈 Data Analysis":
         show_data_analysis()
-    elif page == "🚨 Model Monitoring":
+    elif st.session_state.nav_page == "🚨 Model Monitoring":
         show_model_monitoring()
-    elif page == "📊 Reports":
+    elif st.session_state.nav_page == "📊 Reports":
         show_reports()
 
 def show_dashboard():
@@ -260,15 +276,18 @@ def show_dashboard():
     
     with col1:
         if st.button("🔮 Make Prediction", use_container_width=True):
-            st.switch_page("🔮 Churn Predictor")
+            st.session_state.nav_page = "🔮 Churn Predictor"
+            st.rerun()
     
     with col2:
         if st.button("📊 View Reports", use_container_width=True):
-            st.switch_page("📊 Reports")
+            st.session_state.nav_page = "📊 Reports"
+            st.rerun()
     
     with col3:
         if st.button("🚨 Check Monitoring", use_container_width=True):
-            st.switch_page("🚨 Model Monitoring")
+            st.session_state.nav_page = "🚨 Model Monitoring"
+            st.rerun()
 
 def show_churn_predictor():
     """Show the churn prediction interface."""
